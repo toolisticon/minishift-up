@@ -2,4 +2,4 @@
   set_fact:
     asset_url: "{{ item.browser_download_url }}"
     asset_name: "{{ item.browser_download_url | basename }}"
-  when: item.name | search('linux-amd64.tgz$')
+  when: item.name | regex_search('linux-amd64.tgz$')
