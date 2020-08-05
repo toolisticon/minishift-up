@@ -1,36 +1,51 @@
 # copy_oc_client.yml
 ---
-- name: Get the path to the oc client
-  find:
-    paths: "{{ lookup('env', 'HOME') }}/.minishift/cache/oc"
-    patterns: "v*"
-    hidden: yes
-    file_type: directory
-  register: versions
+- name: Create a temp dir
+  command: mktemp -d -t ansible.XXXXXXXXXX
+  register: temp_output
 
-- name: Set latest_version
+- name: Set tmp_path
   set_fact:
-    latest_version: "{{ versions.files | last }}"
+    tmp_path: "{{ temp_output.stdout }}"
 
-- name: Set path
-  set_fact:
-    oc_path: "{{ latest_version.path }}/{{ ansible_system | lower }}/oc"
+- name: Download mac client
+  get_url:
+    url: "https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-mac.zip"
+    dest: "{{ tmp_path }}/oc.zip"
+  when: ansible_os_family == 'Darwin'
 
-- name: Check if path exists
-  stat:
-    path: '{{ oc_path }}'
-  register: oc
+- name: Download win client
+  get_url:
+    url: "https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-windows.zip"
+    dest: "{{ tmp_path }}/oc.zip"
+  when: ansible_os_family == 'Windows'
 
-- name: Let user know we failed to find oc
-  debug:
-    msg: 'Failed to find {{ oc_path }}. Please file an issue, so we can fix in a future release'
-  when: not oc.stat.exists
+- name: Download linux client
+  get_url:
+    url: "https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz"
+    dest: "{{ tmp_path }}/oc.tar.gz"
+  when: ansible_os_family != 'Darwin' and ansible_os_family != 'Windows'
 
-- name: Copy oc client
-  copy:
-    src: "{{ latest_version.path }}/{{ ansible_system | lower }}/oc"
-    dest: "{{ openshift_client_dest }}/oc"
+- name: Unzip client
+  unarchive:
+    src: "{{ tmp_path }}/oc.zip"
+    dest: "{{ tmp_path }}"
     mode: 0755
     remote_src: yes
-  become: yes
-  when: oc.stat.exists
+  when: ansible_os_family == 'Darwin' or ansible_os_family == 'Windows'
+
+- name: Untar client
+  unarchive:
+    src: "{{ tmp_path }}/oc.tar.gz"
+    dest: "{{ tmp_path }}"
+    mode: 0755
+    remote_src: yes
+  when: ansible_os_family != 'Darwin' and ansible_os_family != 'Windows'
+
+- name: Copy oc client
+  shell: "cp {{ tmp_path }}/*/oc {{ openshift_client_dest }} && chmod 755 {{ openshift_client_dest }}/oc"
+
+- name: Remove the temp directory
+  file:
+    path: "{{ tmp_path }}"
+    state: absent
