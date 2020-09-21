@@ -55,6 +55,31 @@ When the Minishift VM is started, the /Users volume will be mounted to the VM. T
 
 ## Known Issues
 
+### Networking KVM
+
+```
+...
+
+Pinging 8.8.8.8 ... FAIL
+VM is unable to ping external host
+
+...
+```
+Then run the following commands
+
+```
+echo "1" > /proc/sys/net/ipv4/ip_forward
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+```
+Afterwards a `minishift up` should look like this:
+```
+-- Checking if external host is reachable from the Minishift VM ...
+   Pinging 8.8.8.8 ... OK
+-- Checking HTTP connectivity from the VM ...
+   Retrieving http://minishift.io/index.html ... OK
+   ...
+```
+
 ### Fedora
 
 - Before accessing the Docker daemon on the Minishift instance, you'll need to modify the `/etc/sysconfig/docker` script to prevent it from overriding the DOCKER_CERT_PATH environment variable. Edit the file, and change the line `DOCKER_CERT_PATH=/etc/docker` to the following:
